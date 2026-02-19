@@ -474,13 +474,51 @@
             <div class="header">
                 <h1>👥 商家管理</h1>
                 <div class="header-actions">
-                    <button class="btn">+ 新增商家</button>
+                    <button class="btn" onclick="showAddMerchantModal()">+ 新增商家</button>
                 </div>
             </div>
             
             <div class="panel">
                 <h2>商家列表</h2>
-                <div id="merchantContent"></div>
+                <div id="merchantContent">
+                    <p style="color: #64748b; text-align: center; padding: 40px;">載入中...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal: 新增商家 -->
+        <div id="merchantModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8);">
+            <div style="background: #1e293b; margin: 5% auto; padding: 30px; border: 1px solid #334155; border-radius: 15px; width: 90%; max-width: 600px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                    <h2 style="color: #fff; font-size: 24px;">新增商家</h2>
+                    <span onclick="closeModal()" style="color: #94a3b8; font-size: 32px; cursor: pointer;">&times;</span>
+                </div>
+                <form id="merchantForm" onsubmit="event.preventDefault(); saveMerchant();">
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #cbd5e1; font-size: 14px; font-weight: 600; margin-bottom: 8px;">商家名稱 *</label>
+                        <input type="text" id="merchantName" required style="width: 100%; padding: 12px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 14px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #cbd5e1; font-size: 14px; font-weight: 600; margin-bottom: 8px;">聯絡電話 *</label>
+                        <input type="tel" id="merchantPhone" required style="width: 100%; padding: 12px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 14px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #cbd5e1; font-size: 14px; font-weight: 600; margin-bottom: 8px;">客服時間 *</label>
+                        <input type="text" id="merchantTime" required placeholder="例：10:00-22:00" style="width: 100%; padding: 12px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 14px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #cbd5e1; font-size: 14px; font-weight: 600; margin-bottom: 8px;">店家數量上限 *</label>
+                        <input type="number" id="merchantMaxStores" required min="1" value="10" style="width: 100%; padding: 12px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 14px;">
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #cbd5e1; font-size: 14px; font-weight: 600; margin-bottom: 8px;">備註</label>
+                        <textarea id="merchantNote" rows="3" style="width: 100%; padding: 12px; border: 1px solid #334155; border-radius: 8px; background: #0f172a; color: #e2e8f0; font-size: 14px;"></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" class="btn secondary" onclick="closeModal()">取消</button>
+                        <button type="submit" class="btn">儲存</button>
+                    </div>
+                </form>
             </div>
         </div>
         
@@ -602,7 +640,8 @@
                 await Promise.all([
                     loadStats(),
                     loadStores(),
-                    loadRules()
+                    loadRules(),
+                    loadMerchants()
                 ]);
                 hideLoading();
             } catch (error) {
@@ -796,6 +835,92 @@
                 await loadStores();
             } catch (error) {
                 alert('刷新失敗：' + error.message);
+            }
+        }
+        
+        // ========== 商家管理函數 ==========
+        
+        async function loadMerchants() {
+            if (!isConnected) return;
+            
+            try {
+                const merchants = await apiCall('getMerchants');
+                renderMerchants(merchants);
+            } catch (error) {
+                console.error('載入商家失敗:', error);
+                document.getElementById('merchantContent').innerHTML = '<p style="color: #ef4444; text-align: center; padding: 40px;">載入失敗：' + error.message + '</p>';
+            }
+        }
+        
+        function renderMerchants(merchants) {
+            const html = merchants.length > 0 ? `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>商家ID</th>
+                            <th>商家名稱</th>
+                            <th>聯絡電話</th>
+                            <th>客服時間</th>
+                            <th>店家數量</th>
+                            <th>狀態</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${merchants.map(m => `
+                            <tr>
+                                <td><code style="background: #0f172a; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${m.id}</code></td>
+                                <td><strong>${m.name}</strong></td>
+                                <td>${m.phone}</td>
+                                <td>${m.serviceTime}</td>
+                                <td>${m.storeCount} / ${m.maxStores}</td>
+                                <td><span class="badge ${m.status === '啟用' ? 'success' : 'error'}">${m.status}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            ` : '<p style="color: #64748b; text-align: center; padding: 40px;">尚無商家資料<br><small style="font-size: 12px;">點選右上角「+ 新增商家」開始</small></p>';
+            
+            document.getElementById('merchantContent').innerHTML = html;
+        }
+        
+        function showAddMerchantModal() {
+            document.getElementById('merchantModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('merchantModal').style.display = 'none';
+            document.getElementById('merchantForm').reset();
+        }
+        
+        async function saveMerchant() {
+            const formData = {
+                id: 'MERCHANT_' + Date.now().toString().slice(-6),
+                name: document.getElementById('merchantName').value,
+                phone: document.getElementById('merchantPhone').value,
+                serviceTime: document.getElementById('merchantTime').value,
+                maxStores: parseInt(document.getElementById('merchantMaxStores').value),
+                storeCount: 0,
+                status: '啟用',
+                note: document.getElementById('merchantNote').value || ''
+            };
+            
+            if (!formData.name || !formData.phone || !formData.serviceTime || !formData.maxStores) {
+                alert('請填寫必填欄位');
+                return;
+            }
+            
+            try {
+                // 直接寫入 Google Sheets
+                const result = await apiCall('addMerchant', 'POST', formData);
+                if (result.success) {
+                    alert('✅ 新增成功！');
+                    closeModal();
+                    await loadMerchants();
+                } else {
+                    alert('❌ 新增失敗：' + result.message);
+                }
+            } catch (error) {
+                alert('❌ 新增失敗：' + error.message);
             }
         }
         

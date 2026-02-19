@@ -106,6 +106,26 @@ function doGet(e) {
 }
 
 /**
+ * Web App 入口 - POST 請求
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action || 'addMerchant';
+    
+    switch(action) {
+      case 'addMerchant':
+        return jsonResponse(addMerchant(data));
+      default:
+        return jsonResponse({ error: '未知的操作' }, 400);
+    }
+  } catch (error) {
+    Logger.log('doPost 錯誤: ' + error);
+    return jsonResponse({ error: error.toString() }, 500);
+  }
+}
+
+/**
  * 獲取總覽統計數據
  */
 function getStats() {
@@ -402,6 +422,49 @@ function testGetStats() {
   const stats = getStats();
   Logger.log('統計數據：');
   Logger.log(JSON.stringify(stats, null, 2));
+}
+
+/**
+ * 新增商家
+ */
+function addMerchant(data) {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.HQ_SHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.MERCHANTS);
+    
+    if (!sheet) {
+      return { success: false, message: '找不到商家清單分頁' };
+    }
+    
+    // 新增一行資料
+    sheet.appendRow([
+      data.id,
+      data.name,
+      data.phone,
+      data.serviceTime,
+      data.maxStores,
+      data.storeCount,
+      data.status,
+      data.note
+    ]);
+    
+    // 記錄到更新紀錄
+    const logsSheet = ss.getSheetByName(CONFIG.SHEETS.LOGS);
+    if (logsSheet) {
+      logsSheet.appendRow([
+        new Date(),
+        '商家管理',
+        '新增商家：' + data.name,
+        '戰情室',
+        '商家ID: ' + data.id
+      ]);
+    }
+    
+    return { success: true, message: '新增成功', id: data.id };
+  } catch (error) {
+    Logger.log('addMerchant 錯誤: ' + error);
+    return { success: false, message: error.toString() };
+  }
 }
 ```
 
